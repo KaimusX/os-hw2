@@ -20,8 +20,8 @@ int main(int argc, char **argv) {
 	char buf[480];
 
 	/* Checks arguments for server name and port name */
-	if (argc < 3) {
-		fprintf(stderr, "Not enough arguments.\n");
+	if (argc != 3) {
+		fprintf(stderr, "Arguments must be ./<name> <server_name> <port_name>.\n");
 		return 1;
 	}
 	server_name = argv[1];
