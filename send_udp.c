@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
 
 	/* Checks arguments for server name and port name */
 	if (argc < 3) {
-		fprintf(stderr, "Not enough arguments.");
+		fprintf(stderr, "Not enough arguments.\n");
 		return 1;
 	}
 	server_name = argv[1];
@@ -95,6 +95,12 @@ int main(int argc, char **argv) {
 			return 1;
 		}
 	}
-	// TODO Close fd
+	if (close(fd) < 0) {
+		fprintf(stderr, "Cannot close a socket: %s\n",
+			strerror(errno));
+		return 1;
+	}
+
+	/* Signal success */
 	return 0;
 }
