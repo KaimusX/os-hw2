@@ -28,6 +28,7 @@ static int convert_port_name(uint16_t *port, const char *port_name) {
 int main(int argc, char **argv) {
 	char *port_name;
     uint16_t port;
+	int sockfd;
 
 	/* Get port number as argument */
 	if (argc != 2) {
@@ -42,7 +43,14 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-	/* TODO Open socket at port */
+	/* Open a UDP socket at port */
+	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+
+	if (sockfd < 0) {
+		fprintf(stderr, "Could not open a UDP socket: %s\n",
+			strerror(errno));
+		return 1;
+	}
 
 	return 0;
 }
