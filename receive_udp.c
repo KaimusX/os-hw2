@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
     char buffer[BUFFER_SIZE];
 
     if (argc < 2) {
-        fprintf(stderr, "Not enough arguments: ./%s <port name>\n", ((argc > 0) ? argv[0] : "receive_udp"));
+        fprintf(stderr, "Not enough arguments: %s <port name>\n", ((argc > 0) ? argv[0] : "./receive_udp"));
 		return 1;
     }
 

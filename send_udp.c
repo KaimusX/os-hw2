@@ -21,7 +21,8 @@ int main(int argc, char **argv) {
 
 	/* Checks arguments for server name and port name */
 	if (argc != 3) {
-		fprintf(stderr, "Arguments must be ./<name> <server_name> <port_name>.\n");
+		fprintf(stderr, "Not enough arugments: %s <server_name> <port_name>.\n",
+			((argc > 0) ? argv[0] : "./send_udp"));
 		return 1;
 	}
 	server_name = argv[1];
@@ -75,7 +76,7 @@ int main(int argc, char **argv) {
 		if (read_res == ((ssize_t) 0)) {
 			/* We have hit EOF send UDP packet of size 0 to peer */
 			bytes_to_be_sent = (size_t) 0;
-			if (send(fd, buf, bytes_to_be_sent, 0) < ((ssize_t) 0)) {
+			if (send(fd, NULL, bytes_to_be_sent, 0) < ((ssize_t) 0)) {
 				fprintf(stderr, "Error with send: %s\n",
 					strerror(errno));
 				return 1;
