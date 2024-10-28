@@ -33,6 +33,7 @@ int main(int argc, char **argv) {
     struct sockaddr_in addr, recv_addr;
 	socklen_t recv_addr_len = sizeof(recv_addr);
 	char *buf[BUFFER_LEN];
+	ssize_t recv_bytes, send_bytes;
 
 	/* Get port number as argument */
 	if (argc != 2) {
@@ -69,18 +70,33 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-	/* Receives UDP Packets from sender, stores address and length in variable. */
+	/* Receives UDP Packets from sender, stores address and port in variable. */
 	for (;;) {
-		if ((recvfrom(sockfd, buf, BUFFER_LEN, 0, (struct sockaddr *) &recv_addr, &recv_addr_len)) < (ssize_t) 0) {
+		recv_bytes = recvfrom(sockfd, buf, BUFFER_LEN, 0, (struct sockaddr *) &recv_addr, &recv_addr_len);
+		if (recv_bytes < (ssize_t) 0) {
 			fprintf(stderr, "Error with recvfrom: %s",
 				strerror(errno));
 			return 1;
 		}
 	
 	/* Sends back UDP packet */
-
+		send_bytes = sendto(sockfd, buf, recv_bytes, 0, (struct sockaddr *)&recv_addr, recv_addr_len);
+		if (send_bytes < (ssize_t) 0) {
+			fprintf(stderr, "Error with sendto: %s",
+				strerror(errno));
+			return 1;
+		}
 
 	}
-	// recvfrom(int socket, void *restrict buffer, size_t length, int flags, struct sockaddr *restrict address, socklen_t *restrict address_len);
+	
+	/* Close fd */
+	if (close(sockfd) < 0) {
+		fprintf(stderr, "Error with close: %s",
+			strerror(errno));
+		return 1;
+	}
+
+	/* Signal success */
+
 	return 0;
 }
