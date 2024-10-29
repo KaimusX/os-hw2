@@ -31,6 +31,7 @@ int main (int argc, char **argv) {
 	char *tcp_server_name;
 	char *tcp_port_name;
 	int sockfd;
+    struct sockaddr_in addr;
 
 	/* Checks arguments for udp port, tcp server name, tcp port name. */
 	if (argc != 4) {
@@ -57,6 +58,18 @@ int main (int argc, char **argv) {
 		return 1;
 	}
 	
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_port = htons(udp_port);
+
+    if (bind(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+        fprintf(stderr, "Could not bind a UDP socket: %s\n", strerror(errno));
+        if (close(sockfd) < 0) {
+            fprintf(stderr, "Could not close a UDP socket: %s\n", strerror(errno));      
+        }
+        return 1;
+    }
 
 	return 0;
 }
