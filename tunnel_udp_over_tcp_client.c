@@ -30,7 +30,8 @@ int main (int argc, char **argv) {
 	char *udp_port_name;
 	char *tcp_server_name;
 	char *tcp_port_name;
-	
+	int sockfd;
+
 	/* Checks arguments for udp port, tcp server name, tcp port name. */
 	if (argc != 4) {
 		fprintf(stderr, "Not enough arguments: %s <udp_port_name> <tcp_server_name> <tcp_port_name>\n",
@@ -46,6 +47,15 @@ int main (int argc, char **argv) {
         fprintf(stderr, "Error with convert_port_name\n");
         return 1;
     }
+	
+	/* Open a UDP socket at port */
+	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+
+	if (sockfd < 0) {
+		fprintf(stderr, "Could not open a UDP socket: %s\n",
+			strerror(errno));
+		return 1;
+	}
 	
 
 	return 0;
