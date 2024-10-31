@@ -57,6 +57,7 @@ ssize_t better_write(int fd, const char *buf, size_t count) {
 }
 
 int main(int argc, char *argv[]) {
+    const char *port_name;
     uint16_t port;
     int sockfd;
     struct sockaddr_in addr; 
@@ -67,7 +68,7 @@ int main(int argc, char *argv[]) {
 		return 1;
     }
 
-    const char *port_name = argv[1];
+    port_name = argv[1];
 
     if (convert_port_name(&port, port_name) < 0) {
         fprintf(stderr, "Error with convert_port_name\n");
