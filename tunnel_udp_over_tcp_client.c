@@ -37,7 +37,8 @@ int main (int argc, char **argv) {
 	struct addrinfo *result;
 	struct addrinfo *curr;
 	int found;
-	int sockfd;
+	int udp_sockfd;
+	int tcp_sockfd;
 	
 	/* Checks arguments for udp port, tcp server name, tcp port name. */
 	if (argc != 4) {
@@ -56,9 +57,9 @@ int main (int argc, char **argv) {
     }
 	
 	/* Open a UDP socket at port */
-	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+	udp_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
-	if (sockfd < 0) {
+	if (udp_sockfd < 0) {
 		fprintf(stderr, "Could not open a UDP socket: %s\n",
 			strerror(errno));
 		return 1;
@@ -69,9 +70,9 @@ int main (int argc, char **argv) {
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons(udp_port);
 
-    if (bind(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+    if (bind(udp_sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
         fprintf(stderr, "Could not bind a UDP socket: %s\n", strerror(errno));
-        if (close(sockfd) < 0) {
+        if (close(udp_sockfd) < 0) {
             fprintf(stderr, "Could not close a UDP socket: %s\n", strerror(errno));      
         }
         return 1;
@@ -94,14 +95,14 @@ int main (int argc, char **argv) {
 	/* Iterate over the linked list returned by getaddrinfo */
 	found = 0;
 	for (curr = result; curr != NULL; curr=curr->ai_next) {
-		sockfd = socket(curr->ai_family, curr->ai_socktype, curr->ai_protocol);
-		if (sockfd >= 0) {
-			if (connect(sockfd, curr->ai_addr, curr->ai_addrlen) >= 0) {
+		tcp_sockfd = socket(curr->ai_family, curr->ai_socktype, curr->ai_protocol);
+		if (tcp_sockfd >= 0) {
+			if (connect(tcp_sockfd, curr->ai_addr, curr->ai_addrlen) >= 0) {
 				found = 1;
 				break;
 			} else {
-				if (close(sockfd) < 0) {
-					fprintf(stderr, "Could not close a socket: %s\n",
+				if (close(tcp_sockfd) < 0) {
+					fprintf(stderr, "Could not close a TCP socket: %s\n",
 						strerror(errno));
 					freeaddrinfo(result);
 					return 1;
