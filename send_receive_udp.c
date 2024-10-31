@@ -21,9 +21,11 @@ static int convert_port_name(uint16_t *port, const char *port_name) {
     uint16_t t;
     long long int tt;
 
-    if (port_name == NULL || *port_name == '\0') return -1;
+    if (port_name == NULL) return -1;
+    if (*port_name == '\0') return -1;
     nn = strtoll(port_name, &end, 0);
-    if (*end != '\0' || nn < 0) return -1;
+    if (*end != '\0') return -1;
+    if (nn < ((long long int) 0)) return -1;
     t = (uint16_t) nn;
     tt = (long long int) t;
     if (tt != nn) return -1;
