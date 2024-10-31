@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
 
 	/* Checks arguments for server name and port name */
 	if (argc != 3) {
-		fprintf(stderr, "Not enough arugments: %s <server_name> <port_name>.\n",
+		fprintf(stderr, "Not enough arguments: %s <server_name> <port_name>.\n",
 			((argc > 0) ? argv[0] : "./send_udp"));
 		return 1;
 	}
