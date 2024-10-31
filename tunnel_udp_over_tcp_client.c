@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <netdb.h>
 
 // Convert port name to a 16-bit unsigned integer
 static int convert_port_name(uint16_t *port, const char *port_name) {
@@ -30,9 +31,14 @@ int main (int argc, char **argv) {
 	char *udp_port_name;
 	char *tcp_server_name;
 	char *tcp_port_name;
-	int sockfd;
     struct sockaddr_in addr;
-
+	struct addrinfo hints;
+	int gai_code;
+	struct addrinfo *result;
+	struct addrinfo *curr;
+	int found;
+	int sockfd;
+	
 	/* Checks arguments for udp port, tcp server name, tcp port name. */
 	if (argc != 4) {
 		fprintf(stderr, "Not enough arguments: %s <udp_port_name> <tcp_server_name> <tcp_port_name>\n",
@@ -70,6 +76,47 @@ int main (int argc, char **argv) {
         }
         return 1;
     }
+	
+	/* Open a TCP connection to TCP server name and TCP port. */
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = 0;
+	hints.ai_flags = 0;
+	result = NULL;
+	gai_code = getaddrinfo(tcp_server_name, tcp_port_name, &hints, &result);
+
+	if (gai_code != 0) {
+		fprintf(stderr, "Could not look up server address info for %s %s\n",
+			tcp_server_name, tcp_port_name);
+		return 1;
+	}
+	/* Iterate over the linked list returned by getaddrinfo */
+	found = 0;
+	for (curr = result; curr != NULL; curr=curr->ai_next) {
+		sockfd = socket(curr->ai_family, curr->ai_socktype, curr->ai_protocol);
+		if (sockfd >= 0) {
+			if (connect(sockfd, curr->ai_addr, curr->ai_addrlen) >= 0) {
+				found = 1;
+				break;
+			} else {
+				if (close(sockfd) < 0) {
+					fprintf(stderr, "Could not close a socket: %s\n",
+						strerror(errno));
+					freeaddrinfo(result);
+					return 1;
+				}
+			}
+		}
+	}
+	freeaddrinfo(result);
+	if (!found) {
+		fprintf(stderr, "Could not connect to any possible results for %s %s\n",
+			tcp_server_name, tcp_port_name);
+		return 1;
+	}
+
+	/* We have a sockfd file descriptor */
 
 	return 0;
 }
