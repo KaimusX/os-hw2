@@ -7,6 +7,10 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
+#define UDP_BUF_SIZE (1<<16)
+#define TCP_BUF_SIZE ((1<<16) + 2)
+#define RECONSTR_BUF_SIZE ((1<<17) +4)
+
 // Convert port name to a 16-bit unsigned integer
 static int convert_port_name(uint16_t *port, const char *port_name) {
     char *end;
@@ -24,6 +28,10 @@ static int convert_port_name(uint16_t *port, const char *port_name) {
     if (tt != nn) return -1;
     *port = t;
     return 0;
+}
+
+int get_nfds(int fd1, int fd2) {
+	return (fd1 > fd2) ? fd1 + 1 : fd2 + 1;
 }
 
 int main (int argc, char **argv) {
@@ -117,7 +125,12 @@ int main (int argc, char **argv) {
 		return 1;
 	}
 
-	/* We have a sockfd file descriptor */
-
+	/* We must use select for packets on either socket */	
+	char udp_buf[UDP_BUF_SIZE];
+	char tcp_buf[TCP_BUF_SIZE];
+	char reconstr_buf[RECONSTR_BUF_SIZE];
+	fd_set read_fds;
+	int nfds = get_nfds(udp_sockfd, tcp_sockfd);
+	
 	return 0;
 }
