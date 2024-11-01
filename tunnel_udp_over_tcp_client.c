@@ -11,6 +11,36 @@
 #define TCP_BUF_SIZE ((1<<16) + 2)
 #define RECONSTR_BUF_SIZE ((1<<17) +4)
 
+// better_write credit to Dr. Cristoph Lauter
+ssize_t better_write(int fd, const char *buf, size_t count) {
+  size_t already_written, to_be_written, written_this_time, max_count;
+  ssize_t res_write;
+
+  if (count == ((size_t) 0)) return (ssize_t) count;
+  
+  already_written = (size_t) 0;
+  to_be_written = count;
+  while (to_be_written > ((size_t) 0)) {
+    max_count = to_be_written;
+    if (max_count > ((size_t) 8192)) {
+      max_count = (size_t) 8192;
+    }
+    res_write = write(fd, &(((const char *) buf)[already_written]), max_count);
+    if (res_write < ((size_t) 0)) {
+      /* Error */
+      return res_write;
+    }
+    if (res_write == ((ssize_t) 0)) {
+      /* Nothing written, stop trying */
+      return (ssize_t) already_written;
+    }
+    written_this_time = (size_t) res_write;
+    already_written += written_this_time;
+    to_be_written -= written_this_time;
+  }
+  return (ssize_t) already_written;
+}
+
 // Convert port name to a 16-bit unsigned integer
 static int convert_port_name(uint16_t *port, const char *port_name) {
     char *end;
@@ -32,6 +62,10 @@ static int convert_port_name(uint16_t *port, const char *port_name) {
 
 int get_nfds(int fd1, int fd2) {
 	return (fd1 > fd2) ? fd1 + 1 : fd2 + 1;
+}
+
+uint16_t get_msg_size(uint16_t recv_bytes, uint16_t buf_size) {
+	return (recv_bytes < buf_size) ? recv_bytes : buf_size;
 }
 
 int main (int argc, char **argv) {
@@ -129,8 +163,76 @@ int main (int argc, char **argv) {
 	char udp_buf[UDP_BUF_SIZE];
 	char tcp_buf[TCP_BUF_SIZE];
 	char reconstr_buf[RECONSTR_BUF_SIZE];
+	char msg_buf[UDP_BUF_SIZE + 2]; // +2 for the header indicating message length.
 	fd_set read_fds;
 	int nfds = get_nfds(udp_sockfd, tcp_sockfd);
+    struct sockaddr_in udp_addr;
+	socklen_t udp_addr_len = sizeof(udp_addr);
+	ssize_t recv_bytes;
+	int udp_info_ready = -1;
+	uint16_t msg_size;
+	uint16_t udp_packet_size_header;
+
+	for(;;) {
+		/* Set FD's for select */
+		FD_ZERO(&read_fds);
+		FD_SET(udp_sockfd, &read_fds);
+		FD_SET(tcp_sockfd, &read_fds);
+		
+		/* Try to select */
+		if (select(nfds, &read_fds, NULL, NULL, NULL) < 0) {
+			fprintf(stderr, "Could not select: %s\n",
+				strerror(errno));
+			if (close(udp_sockfd) < 0) {
+				fprintf(stderr, "Could not close UDP sockfd: %s\n",
+					strerror(errno));
+			}
+			if (close(tcp_sockfd) < 0) {
+				fprintf(stderr, "Could not close TCP sockfd: %s\n",
+					strerror(errno));
+			}
+			return 1;
+		}
+
+		/* UDP socket ready, recvfrom packets. */
+		if (FD_ISSET(udp_sockfd, &read_fds)) {
+			recv_bytes = recvfrom(udp_sockfd, udp_buf, UDP_BUF_SIZE, 0, 
+			(struct sockaddr *) &udp_addr, &udp_addr_len);
+			if (recv_bytes < (ssize_t) 0) {
+				fprintf(stderr, "Could not recvfrom on UDP socket %s\n",
+					strerror(errno));
+				return 1;
+			}
+			/* Bytes received, udp info is ready */
+			udp_info_ready = 0;
+
+			/* Create message of size at most 2^16 + 2 bytes. */
+			msg_size = get_msg_size((uint16_t) recv_bytes, (uint16_t) UDP_BUF_SIZE);
+			/* Store udp packet size first */
+			udp_packet_size_header = htons(msg_size);
+			msg_buf[0] = (udp_packet_size_header >> 8) & 0xFF; // Upper 8 bytes
+			msg_buf[1] = udp_packet_size_header & 0xFF; // Lower 8 bytes
+			
+			/* Write formatted message to TCP */
+
+			ssize_t bytes_to_be_written = msg_size + 2;
+			if (better_write(tcp_sockfd, msg_buf, bytes_to_be_written) < 0){
+				fprintf(stderr, "Could not  write to TCP socket: %s\n",
+					strerror(errno));
+				if (close(udp_sockfd) < 0) {
+					fprintf(stderr, "Could not close UDP socket: %s\n",
+						strerror(errno));
+					if (close(tcp_sockfd) < 0 ) {
+						fprintf(stderr, "Could not close a TCP socket: %s\n",
+							strerror(errno));
+					}
+				}
+				return 1;
+			}
+
+		}
+
+	}
 	
 	return 0;
 }
