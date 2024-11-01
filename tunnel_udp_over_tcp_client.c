@@ -213,8 +213,14 @@ int main (int argc, char **argv) {
 			msg_buf[0] = (udp_packet_size_header >> 8) & 0xFF; // Upper 8 bytes
 			msg_buf[1] = udp_packet_size_header & 0xFF; // Lower 8 bytes
 			
-			/* Write formatted message to TCP */
+			/* Now we can put msg after header */
+			if (msg_size > 0) {
+				for (int i = 0; i < msg_size; i++) {
+					msg_buf[i + 2] = udp_buf[i]; // Copy after 2 header bytes 
+				}
+			}
 
+			/* Write formatted message to TCP */
 			ssize_t bytes_to_be_written = msg_size + 2;
 			if (better_write(tcp_sockfd, msg_buf, bytes_to_be_written) < 0){
 				fprintf(stderr, "Could not  write to TCP socket: %s\n",
@@ -222,15 +228,15 @@ int main (int argc, char **argv) {
 				if (close(udp_sockfd) < 0) {
 					fprintf(stderr, "Could not close UDP socket: %s\n",
 						strerror(errno));
-					if (close(tcp_sockfd) < 0 ) {
+					if (close(tcp_sockfd) < 0) {
 						fprintf(stderr, "Could not close a TCP socket: %s\n",
 							strerror(errno));
 					}
 				}
 				return 1;
 			}
-
 		}
+
 
 	}
 	
