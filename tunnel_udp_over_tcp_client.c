@@ -172,6 +172,8 @@ int main (int argc, char **argv) {
 	int udp_info_ready = -1;
 	uint16_t msg_size;
 	uint16_t udp_packet_size_header;
+	size_t rolling_index = 0;
+	size_t tcp_message_length = 0;
 
 	for(;;) {
 		/* Set FD's for select */
@@ -183,20 +185,7 @@ int main (int argc, char **argv) {
 		if (select(nfds, &read_fds, NULL, NULL, NULL) < 0) {
 			fprintf(stderr, "Could not select: %s\n",
 				strerror(errno));
-			if (close(udp_sockfd) < 0) {
-				fprintf(stderr, "Could not close UDP sockfd: %s\n",
-					strerror(errno));
-				if (close(tcp_sockfd) < 0) {
-					fprintf(stderr, "Could not close TCP sockfd: %s\n",
-						strerror(errno));
-					return 1;
-				}
-			}
-			if (close(tcp_sockfd) < 0) {
-				fprintf(stderr, "Could not close TCP sockfd: %s\n",
-					strerror(errno));
-			}
-			return 1;
+			goto close_sockets;
 		}
 
 		/* UDP socket ready, recvfrom packets. */
@@ -230,20 +219,7 @@ int main (int argc, char **argv) {
 			if (better_write(tcp_sockfd, msg_buf, bytes_to_be_written) < 0){
 				fprintf(stderr, "Could not  write to TCP socket: %s\n",
 					strerror(errno));
-				if (close(udp_sockfd) < 0) {
-					fprintf(stderr, "Could not close UDP socket: %s\n",
-						strerror(errno));
-					if (close(tcp_sockfd) < 0) {
-						fprintf(stderr, "Could not close a TCP socket: %s\n",
-							strerror(errno));
-						return 1;
-					}
-				}
-				if (close(tcp_sockfd) < 0) {
-					fprintf(stderr, "Could not close a TCP socket: %s\n",
-						strerror(errno));
-				}
-				return 1;
+				goto close_sockets;
 			}
 		}
 		
@@ -254,31 +230,60 @@ int main (int argc, char **argv) {
 			if (read_res < 0) {
 				fprintf(stderr, "Could not read from TCP socket: %s\n",
 					strerror(errno));
-				if (close(udp_sockfd) < 0) {
-					fprintf(stderr, "Could not close UDP socket: %s\n",
-						strerror(errno));
-					if (close(tcp_sockfd) < 0) {
-						fprintf(stderr, "Could not close a TCP socket: %s\n",
-							strerror(errno));
-						return 1;
-					}
-				}
-				if (close(tcp_sockfd) < 0) {
-					fprintf(stderr, "Could not close a TCP socket: %s\n",
-						strerror(errno));
-				return 1;
-				}
+				goto close_sockets;
 			}
-			/* EOF */
+			/* EOF on TCP fd, program terminates.*/
 			if (read_res == 0) {
 				break;
 			}
 			
-			/* TODO: Reconstruct message */
+			/* Reconstruct message, copy bytes 1 to 1 */
+			for(size_t tcp_index = 0; tcp_index < read_res; tcp_index++) {
+				reconstr_buf[rolling_index] = tcp_buf[tcp_index];
+				rolling_index++;
+				
+				/* Ensure header bytes are first 2 */
+				if (rolling_index == 2 && tcp_message_length == 0) {
+					udp_packet_size_header = (uint16_t)(uint8_t)reconstr_buf[0] << 8;
+					udp_packet_size_header |= (uint8_t)reconstr_buf[1];
+					tcp_message_length = ntohs(udp_packet_size_header);
+				}
 
+				/* Reconstruct rest of message */
+				if (tcp_message_length > 0 &&
+					rolling_index == tcp_message_length + 2 && udp_info_ready == 0) {
+					if (sendto(udp_sockfd, reconstr_buf + 2, tcp_message_length, 0,
+						(struct sockaddr *) &udp_addr, udp_addr_len) < 0){
+						fprintf(stderr, "Could not sendto() UDP socket: %s\n",
+							strerror(errno));
+						goto close_sockets;
+					}
+
+					/* Message complete, reset for next header. */
+					rolling_index = 0;
+					tcp_message_length = 0;
+				}
+				/* No message received. */
+				if (tcp_message_length == 0 && rolling_index > 2) rolling_index = 0;
+			}
 		}
-
 	}
-	
+close_sockets: 
+	if (close(udp_sockfd) < 0) {
+		fprintf(stderr, "Could not close a UDP socket: %s\n",
+			strerror(errno));
+		if (close(tcp_sockfd) < 0) {
+			fprintf(stderr, "Could not close a TCP socket: %s\n",
+				strerror(errno));
+			return 1;
+		}
+	}
+
+	if (close(tcp_sockfd) < 0) {
+		fprintf(stderr, "Could not close a TCP socket: %s\n",
+			strerror(errno));
+		return 1;
+	}
+
 	return 0;
 }
