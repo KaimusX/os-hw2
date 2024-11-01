@@ -186,6 +186,11 @@ int main (int argc, char **argv) {
 			if (close(udp_sockfd) < 0) {
 				fprintf(stderr, "Could not close UDP sockfd: %s\n",
 					strerror(errno));
+				if (close(tcp_sockfd) < 0) {
+					fprintf(stderr, "Could not close TCP sockfd: %s\n",
+						strerror(errno));
+					return 1;
+				}
 			}
 			if (close(tcp_sockfd) < 0) {
 				fprintf(stderr, "Could not close TCP sockfd: %s\n",
@@ -231,12 +236,47 @@ int main (int argc, char **argv) {
 					if (close(tcp_sockfd) < 0) {
 						fprintf(stderr, "Could not close a TCP socket: %s\n",
 							strerror(errno));
+						return 1;
 					}
+				}
+				if (close(tcp_sockfd) < 0) {
+					fprintf(stderr, "Could not close a TCP socket: %s\n",
+						strerror(errno));
 				}
 				return 1;
 			}
 		}
+		
+		/* TCP socket ready, read */
+		if (FD_ISSET(tcp_sockfd, &read_fds)) {
+			int read_res;
+			read_res = read(tcp_sockfd, tcp_buf, TCP_BUF_SIZE);
+			if (read_res < 0) {
+				fprintf(stderr, "Could not read from TCP socket: %s\n",
+					strerror(errno));
+				if (close(udp_sockfd) < 0) {
+					fprintf(stderr, "Could not close UDP socket: %s\n",
+						strerror(errno));
+					if (close(tcp_sockfd) < 0) {
+						fprintf(stderr, "Could not close a TCP socket: %s\n",
+							strerror(errno));
+						return 1;
+					}
+				}
+				if (close(tcp_sockfd) < 0) {
+					fprintf(stderr, "Could not close a TCP socket: %s\n",
+						strerror(errno));
+				return 1;
+				}
+			}
+			/* EOF */
+			if (read_res == 0) {
+				break;
+			}
+			
+			/* TODO: Reconstruct message */
 
+		}
 
 	}
 	
