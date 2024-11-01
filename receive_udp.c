@@ -27,6 +27,7 @@ static int convert_port_name(uint16_t *port, const char *port_name) {
     return 0;
 }
 
+// Better write
 ssize_t better_write(int fd, const char *buf, size_t count) {
   size_t already_written, to_be_written, written_this_time, max_count;
   ssize_t res_write;
@@ -62,31 +63,37 @@ int main(int argc, char *argv[]) {
     int sockfd;
     struct sockaddr_in addr; 
     char buffer[BUFFER_SIZE];
+    int bytes_received;
 
+    // Check for arguments
     if (argc < 2) {
         fprintf(stderr, "Not enough arguments: %s <port name>\n", ((argc > 0) ? argv[0] : "./receive_udp"));
 		return 1;
     }
 
+    // Assign variable
     port_name = argv[1];
 
+    // Get port number
     if (convert_port_name(&port, port_name) < 0) {
-        fprintf(stderr, "Error with convert_port_name\n");
+        fprintf(stderr, "Error with convert_port_name: %s\n", strerror(errno));
         return 1;
     }
 
+    // Create socket
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-
+    // For if socket failed
     if (sockfd < 0) {
         fprintf(stderr, "Could not open a UDP socket: %s\n", strerror(errno));
         return 1; 
     }
 
+    // Bind socket
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons(port);
-
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    // Binding
     if (bind(sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
         fprintf(stderr, "Could not bind a UDP socket: %s\n", strerror(errno));
         if (close(sockfd) < 0) {
@@ -96,8 +103,11 @@ int main(int argc, char *argv[]) {
     }
 
     for (;;) {
-        ssize_t recv_len = recv(sockfd, buffer, sizeof(buffer), 0);
-        if (recv_len < 0) {
+        // Receive data
+        bytes_received = recv(sockfd, buffer, sizeof(buffer), 0);
+        
+        // For if recv failed
+        if (bytes_received < 0) {
             fprintf(stderr, "Error with recv: %s\n", strerror(errno));
             if (close(sockfd) < 0) {
                 fprintf(stderr, "Could not close a UDP socket: %s\n", strerror(errno));      
@@ -106,10 +116,11 @@ int main(int argc, char *argv[]) {
         }
 
         // If an empty packet is received, terminate the program
-        if (recv_len == 0) break;
+        if (bytes_received == 0) break;
 
-        if (better_write(1, buffer, recv_len) < 0) {
-            fprintf(stderr, "Error with better_write\n");
+        // Print received data
+        if (better_write(STDOUT_FILENO, buffer, bytes_received) < 0) {
+            fprintf(stderr, "Error with better_write: %s\n", strerror(errno));
             if (close(sockfd) < 0) {
                 fprintf(stderr, "Could not close a UDP socket: %s\n", strerror(errno));      
             }
@@ -117,9 +128,12 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // Clean up
     if (close(sockfd) < 0) {
         fprintf(stderr, "Could not close a UDP socket: %s\n", strerror(errno));
         return 1;
     }
+
+    // Success
     return 0;
 }
