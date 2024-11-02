@@ -1,7 +1,7 @@
 CC = cc
 CFLAGS = -O3 -Wall
 
-TARGETS = send_udp receive_udp reply_udp send_receive_udp tunnel_udp_over_tcp_client
+TARGETS = send_udp receive_udp reply_udp send_receive_udp tunnel_udp_over_tcp_client tunnel_udp_over_tcp_server
 
 all: $(TARGETS)
 
