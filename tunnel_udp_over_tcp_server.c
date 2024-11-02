@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
         if (close(tcp_sockfd) < 0) {
             fprintf(stderr, "Could not close a UDP socket: %s\n", strerror(errno));      
         }
-		return 1;
+        return 1;
 	}
 
     // Create socket and check connect 
