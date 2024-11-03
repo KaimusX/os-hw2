@@ -117,9 +117,9 @@ int main(int argc, char *argv[]) {
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     // Binding
     if (bind(tcp_sockfd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-        fprintf(stderr, "Could not bind a UDP socket: %s\n", strerror(errno));
+        fprintf(stderr, "Could not bind a TCP socket: %s\n", strerror(errno));
         if (close(tcp_sockfd) < 0) {
-            fprintf(stderr, "Could not close a UDP socket: %s\n", strerror(errno));      
+            fprintf(stderr, "Could not close a TCP socket: %s\n", strerror(errno));      
         }
         return 1;
     }
@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
 	if (gai_code != 0) {
 		fprintf(stderr, "Could not look up server address info for %s %s\n", udp_server_name, udp_port_name);
         if (close(tcp_sockfd) < 0) {
-            fprintf(stderr, "Could not close a UDP socket: %s\n", strerror(errno));      
+            fprintf(stderr, "Could not close a TCP socket: %s\n", strerror(errno));      
         }
         return 1;
 	}
