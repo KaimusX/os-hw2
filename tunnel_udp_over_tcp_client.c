@@ -234,7 +234,6 @@ int main (int argc, char **argv) {
 		if (FD_ISSET(tcp_sockfd, &read_fds)) {
 			int read_res;
 			read_res = read(tcp_sockfd, tcp_buf, TCP_BUF_SIZE);
-			fprintf(stderr, "READ RES: %d\n", read_res);
 			if (read_res < 0) {
 				fprintf(stderr, "Could not read from TCP socket: %s\n",
 					strerror(errno));
