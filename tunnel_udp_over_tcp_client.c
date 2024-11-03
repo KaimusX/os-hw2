@@ -60,11 +60,19 @@ static int convert_port_name(uint16_t *port, const char *port_name) {
     return 0;
 }
 
+void custom_memcpy(void *dest, const void *src, size_t length) {
+    unsigned char *d = dest;
+    const unsigned char *s = src;
+    while (length--) {
+        *d++ = *s++;
+    }
+}
+
 int get_nfds(int fd1, int fd2) {
 	return (fd1 > fd2) ? fd1 + 1 : fd2 + 1;
 }
 
-uint16_t get_msg_size(uint16_t recv_bytes, uint16_t buf_size) {
+int get_msg_size(int recv_bytes, int buf_size) {
 	return (recv_bytes < buf_size) ? recv_bytes : buf_size;
 }
 
@@ -126,7 +134,7 @@ int main (int argc, char **argv) {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = 0;
 	hints.ai_flags = 0;
-	result = NULL;
+	result = NULL; 
 	gai_code = getaddrinfo(tcp_server_name, tcp_port_name, &hints, &result);
 
 	if (gai_code != 0) {
@@ -152,28 +160,30 @@ int main (int argc, char **argv) {
 			}
 		}
 	}
-	freeaddrinfo(result);
+
 	if (!found) {
 		fprintf(stderr, "Could not connect to any possible results for %s %s\n",
 			tcp_server_name, tcp_port_name);
 		return 1;
 	}
 
+	freeaddrinfo(result);
+
 	/* We must use select for packets on either socket */	
-	char udp_buf[UDP_BUF_SIZE];
-	char tcp_buf[TCP_BUF_SIZE];
+	char udp_buf[UDP_BUF_SIZE]; 
+	char tcp_buf[TCP_BUF_SIZE]; 
 	char reconstr_buf[RECONSTR_BUF_SIZE];
-	char msg_buf[UDP_BUF_SIZE + 2]; // +2 for the header indicating message length.
-	fd_set read_fds;
-	int nfds = get_nfds(udp_sockfd, tcp_sockfd);
-    struct sockaddr_in udp_addr;
-	socklen_t udp_addr_len = sizeof(udp_addr);
-	ssize_t recv_bytes;
-	int udp_info_ready = -1;
-	uint16_t msg_size;
+	char msg_buf[UDP_BUF_SIZE + 2]; // +2 for the header indicating message length.  -----
+	fd_set read_fds; 
+	int nfds = get_nfds(udp_sockfd, tcp_sockfd); 
+    struct sockaddr_in udp_addr; 
+	socklen_t udp_addr_len = sizeof(udp_addr); 
+	ssize_t recv_bytes; 
+	int udp_info_ready = 0;
+	uint16_t msg_size;  
 	uint16_t udp_packet_size_header;
 	size_t rolling_index = 0;
-	size_t tcp_message_length = 0;
+	size_t tcp_message_length = 0; 
 
 	for(;;) {
 		/* Set FD's for select */
@@ -182,7 +192,8 @@ int main (int argc, char **argv) {
 		FD_SET(tcp_sockfd, &read_fds);
 		
 		/* Try to select */
-		if (select(nfds, &read_fds, NULL, NULL, NULL) < 0) {
+		int select_result = select(nfds, &read_fds, NULL, NULL, NULL); 
+		if (select_result < 0) {
 			fprintf(stderr, "Could not select: %s\n",
 				strerror(errno));
 			goto close_sockets;
@@ -198,24 +209,20 @@ int main (int argc, char **argv) {
 				return 1;
 			}
 			/* Bytes received, udp info is ready */
-			udp_info_ready = 0;
+			udp_info_ready = 1;
 
-			/* Create message of size at most 2^16 + 2 bytes. */
-			msg_size = get_msg_size((uint16_t) recv_bytes, (uint16_t) UDP_BUF_SIZE);
-			/* Store udp packet size first */
-			udp_packet_size_header = htons(msg_size);
-			msg_buf[0] = (udp_packet_size_header >> 8) & 0xFF; // Upper 8 bytes
-			msg_buf[1] = udp_packet_size_header & 0xFF; // Lower 8 bytes
-			
-			/* Now we can put msg after header */
-			if (msg_size > 0) {
-				for (int i = 0; i < msg_size; i++) {
-					msg_buf[i + 2] = udp_buf[i]; // Copy after 2 header bytes 
-				}
+			/*Message length*/
+			msg_size = (recv_bytes < UDP_BUF_SIZE ? recv_bytes : UDP_BUF_SIZE);
+			udp_packet_size_header = htons((uint16_t)msg_size);
+			custom_memcpy(msg_buf, &udp_packet_size_header, 2);
+			if(recv_bytes > 0) custom_memcpy(msg_buf+2,udp_buf,msg_size);
+
+			/*Write into TCP FD*/
+			size_t bytes_to_be_written = recv_bytes + 2;
+			if(recv_bytes == 0){
+				bytes_to_be_written = 2;
 			}
-
-			/* Write formatted message to TCP */
-			ssize_t bytes_to_be_written = msg_size + 2;
+			
 			if (better_write(tcp_sockfd, msg_buf, bytes_to_be_written) < 0){
 				fprintf(stderr, "Could not  write to TCP socket: %s\n",
 					strerror(errno));
@@ -227,6 +234,7 @@ int main (int argc, char **argv) {
 		if (FD_ISSET(tcp_sockfd, &read_fds)) {
 			int read_res;
 			read_res = read(tcp_sockfd, tcp_buf, TCP_BUF_SIZE);
+			fprintf(stderr, "READ RES: %d\n", read_res);
 			if (read_res < 0) {
 				fprintf(stderr, "Could not read from TCP socket: %s\n",
 					strerror(errno));
@@ -239,26 +247,33 @@ int main (int argc, char **argv) {
 			
 			/* Reconstruct message, copy bytes 1 to 1 */
 			for(size_t tcp_index = 0; tcp_index < read_res; tcp_index++) {
+				if (rolling_index >= RECONSTR_BUF_SIZE){ 
+					fprintf(stderr, "Index is greater than reconstruction buf\n");
+					goto close_sockets;
+				}
 				reconstr_buf[rolling_index] = tcp_buf[tcp_index];
 				rolling_index++;
 				
 				/* Ensure header bytes are first 2 */
 				if (rolling_index == 2 && tcp_message_length == 0) {
-					udp_packet_size_header = (uint16_t)(uint8_t)reconstr_buf[0] << 8;
-					udp_packet_size_header |= (uint8_t)reconstr_buf[1];
+					custom_memcpy(&udp_packet_size_header,reconstr_buf,2);
 					tcp_message_length = ntohs(udp_packet_size_header);
+					if (tcp_message_length > UDP_BUF_SIZE) {
+						fprintf(stderr, "Invalid message length\n");
+						goto close_sockets;
+					}
 				}
 
 				/* Reconstruct rest of message */
-				if (tcp_message_length > 0 &&
-					rolling_index == tcp_message_length + 2 && udp_info_ready == 0) {
-					if (sendto(udp_sockfd, reconstr_buf + 2, tcp_message_length, 0,
-						(struct sockaddr *) &udp_addr, udp_addr_len) < 0){
-						fprintf(stderr, "Could not sendto() UDP socket: %s\n",
-							strerror(errno));
-						goto close_sockets;
+				if (tcp_message_length > 0 && rolling_index == tcp_message_length + 2 ) {
+					if (udp_info_ready){
+						if (sendto(udp_sockfd, reconstr_buf + 2, tcp_message_length, 0,
+							(struct sockaddr *) &udp_addr, udp_addr_len) < 0){
+							fprintf(stderr, "Could not sendto() UDP socket: %s\n",
+								strerror(errno));
+							goto close_sockets;
+						}
 					}
-
 					/* Message complete, reset for next header. */
 					rolling_index = 0;
 					tcp_message_length = 0;
